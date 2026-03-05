@@ -16,63 +16,117 @@ struct IslandCentralDisplayView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var locationManager: LocationManager
     @State private var isBikeSceneReady = false
-    @State private var cameraPosition: MapCameraPosition = .camera(
+    @State private var mapCameraPosition: MapCameraPosition = .camera(
         MapCamera(
-            centerCoordinate: trgBanaJelacica,
-            distance: defaultCameraDistance,
+            centerCoordinate: CLLocationCoordinate2D(latitude: 45.8129, longitude: 15.9775),
+            distance: 500,
             heading: 0,
             pitch: 60
         )
     )
 
-    var body: some View {
-        ZStack {
-            if appState.isRouteActive {
-                Map(position: $cameraPosition) {
-                    if let route = appState.activeRoute, !route.waypoints.isEmpty {
-                        MapPolyline(coordinates: route.waypoints)
-                            .stroke(.blue, lineWidth: 5)
-                    }
-                }
-                .mapStyle(.standard(elevation: .realistic))
-                .transition(.opacity.animation(.easeInOut(duration: routeTransitionDuration)))
-            } else {
-                Color.white
-                    .transition(.opacity.animation(.easeInOut(duration: routeTransitionDuration)))
-            }
-
-            VStack(spacing: 0) {
-                if appState.isRouteActive {
-                    Spacer(minLength: 0)
-                    bikeView(width: mapBikeWidth, height: mapBikeHeight, findMeMode: true)
-                    Spacer(minLength: 0)
-                } else {
-                    Spacer(minLength: 16)
-                    bikeView(width: normalBikeWidth, height: normalBikeHeight, findMeMode: false)
-                    Spacer(minLength: 220)
-                }
-            }
-            .animation(bikeSpring, value: appState.isRouteActive)
-        }
-        .animation(.easeInOut(duration: routeTransitionDuration), value: appState.isRouteActive)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.primary.opacity(0.25), lineWidth: 1)
+    private var cameraFromAppState: MapCameraPosition {
+        .camera(
+            MapCamera(
+                centerCoordinate: appState.mapCenter,
+                distance: appState.mapCameraDistance,
+                heading: appState.mapHeading,
+                pitch: appState.mapIs3D ? 60 : 0
+            )
         )
-        .onChange(of: appState.focusMapOnUserLocationTrigger) { _, _ in
-            requestFreshLocationForFindMe()
+    }
+
+    var body: some View {
+        contentWithLayout
+            .modifier(IslandCentralMapModifier(
+                onSync: syncMapPositionFromAppState,
+                onRequestLocation: requestFreshLocationForFindMe,
+                onCenter: centerCamera(on:),
+                onFitRoute: fitCameraToRoute,
+                isLocationValid: isLocationValidForMap
+            ))
+    }
+
+    private var contentWithLayout: some View {
+        mainZStack
+            .animation(.easeInOut(duration: routeTransitionDuration), value: appState.isRouteActive)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.primary.opacity(0.25), lineWidth: 1)
+            )
+    }
+
+    private var mainZStack: some View {
+        ZStack {
+            mapOrBackgroundView
+            bikeOverlayView
         }
-        .onChange(of: locationManager.currentLocation) { _, newLocation in
-            if appState.focusMapOnUserLocationTrigger > 0, let loc = newLocation, isLocationValidForMap(loc) {
-                centerCamera(on: loc.coordinate)
-                locationManager.stopUpdatingLocation()
+    }
+
+    @ViewBuilder
+    private var mapOrBackgroundView: some View {
+        if appState.isRouteActive {
+            ZStack {
+                mapView
+                if !appState.mapPanningEnabled {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea()
+                }
+            }
+            .preferredColorScheme(appState.mapDarkStyle ? .dark : .light)
+            .transition(.opacity.animation(.easeInOut(duration: routeTransitionDuration)))
+        } else {
+            Color.white
+                .transition(.opacity.animation(.easeInOut(duration: routeTransitionDuration)))
+        }
+    }
+
+    @ViewBuilder
+    private var bikeOverlayView: some View {
+        VStack(spacing: 0) {
+            if appState.isRouteActive {
+                Spacer(minLength: 0)
+                bikeView(width: mapBikeWidth, height: mapBikeHeight, findMeMode: true)
+                Spacer(minLength: 0)
+            } else {
+                Spacer(minLength: 16)
+                bikeView(width: normalBikeWidth, height: normalBikeHeight, findMeMode: false)
+                Spacer(minLength: 220)
             }
         }
-        .onChange(of: appState.activeRoute) { _, newRoute in
-            if let route = newRoute, !route.waypoints.isEmpty {
-                fitCameraToRoute(route.waypoints)
+        .animation(bikeSpring, value: appState.isRouteActive)
+    }
+
+    private func syncMapPositionFromAppState() {
+        mapCameraPosition = cameraFromAppState
+    }
+
+    private var mapView: AnyView {
+        switch appState.mapStyle {
+        case .standard:
+            return AnyView(mapWithBinding.mapStyle(.standard(elevation: .realistic)))
+        case .satellite:
+            return AnyView(mapWithBinding.mapStyle(.imagery(elevation: .realistic)))
+        case .hybrid:
+            return AnyView(mapWithBinding.mapStyle(.hybrid(elevation: .realistic)))
+        case .flyover:
+            return AnyView(mapWithBinding.mapStyle(.standard(elevation: .realistic)))
+        }
+    }
+
+    private var mapWithBinding: some View {
+        Map(position: $mapCameraPosition) {
+            if let route = appState.activeRoute, !route.waypoints.isEmpty {
+                MapPolyline(coordinates: route.waypoints)
+                    .stroke(.blue, lineWidth: 5)
             }
+        }
+        .onMapCameraChange(frequency: .onEnd) { context in
+            appState.mapCenter = context.camera.centerCoordinate
+            appState.mapCameraDistance = context.camera.distance
+            appState.mapHeading = context.camera.heading
         }
     }
 
@@ -87,12 +141,12 @@ struct IslandCentralDisplayView: View {
             longitude: (minLon + maxLon) / 2
         )
         let span = max(maxLat - minLat, maxLon - minLon) * 1.4
-        let region = MKCoordinateRegion(
-            center: center,
-            span: MKCoordinateSpan(latitudeDelta: max(span, 0.02), longitudeDelta: max(span, 0.02))
-        )
+        let delta = max(span, 0.02)
+        let distance = Double( delta * 111_000 * 2.5 )
         withAnimation(.easeInOut(duration: 0.4)) {
-            cameraPosition = .region(region)
+            appState.mapCenter = center
+            appState.mapCameraDistance = min(2000, max(300, distance))
+            appState.mapHeading = 0
         }
     }
 
@@ -130,19 +184,66 @@ struct IslandCentralDisplayView: View {
 
     private func centerCamera(on coordinate: CLLocationCoordinate2D) {
         withAnimation(.easeInOut(duration: 0.35)) {
-            cameraPosition = .camera(
-                MapCamera(
-                    centerCoordinate: coordinate,
-                    distance: userLocationCameraDistance,
-                    heading: 0,
-                    pitch: 60
-                )
-            )
+            appState.mapCenter = coordinate
+            appState.mapCameraDistance = userLocationCameraDistance
+            appState.mapHeading = 0
         }
+    }
+}
+
+// MARK: - Modifier s onChange handlerima; body rastavljen u manje izraze zbog type-checkera
+private struct IslandCentralMapModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var locationManager: LocationManager
+
+    let onSync: () -> Void
+    let onRequestLocation: () -> Void
+    let onCenter: (CLLocationCoordinate2D) -> Void
+    let onFitRoute: ([CLLocationCoordinate2D]) -> Void
+    let isLocationValid: (CLLocation) -> Bool
+
+    func body(content: Content) -> some View {
+        let withLocation = addLocationHandlers(content)
+        let withRoute = addRouteHandlers(withLocation)
+        return addMapSyncHandlers(withRoute)
+    }
+
+    private func addLocationHandlers<V: View>(_ view: V) -> some View {
+        view
+            .onChange(of: appState.focusMapOnUserLocationTrigger) { _, _ in
+                onRequestLocation()
+            }
+            .onChange(of: locationManager.currentLocation) { _, newLocation in
+                if appState.focusMapOnUserLocationTrigger > 0, let loc = newLocation, isLocationValid(loc) {
+                    onCenter(loc.coordinate)
+                    locationManager.stopUpdatingLocation()
+                }
+            }
+    }
+
+    private func addRouteHandlers<V: View>(_ view: V) -> some View {
+        view
+            .onChange(of: appState.activeRoute) { _, newRoute in
+                if let route = newRoute, !route.waypoints.isEmpty {
+                    onFitRoute(route.waypoints)
+                }
+            }
+            .onChange(of: appState.isRouteActive) { _, active in
+                if active { onSync() }
+            }
+    }
+
+    private func addMapSyncHandlers<V: View>(_ view: V) -> some View {
+        view
+            .onChange(of: appState.mapCenter) { _, _ in onSync() }
+            .onChange(of: appState.mapCameraDistance) { _, _ in onSync() }
+            .onChange(of: appState.mapHeading) { _, _ in onSync() }
+            .onChange(of: appState.mapIs3D) { _, _ in onSync() }
     }
 }
 
 #Preview {
     IslandCentralDisplayView()
         .environmentObject(AppState())
+        .environmentObject(LocationManager())
 }

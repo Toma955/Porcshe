@@ -1,7 +1,7 @@
 import Foundation
 
-/// standard, flyover, hybrid, satellite
-enum MapStyle: String, CaseIterable {
+/// Tip karte (topologija): standard, flyover, hybrid, satellite.
+enum MapTerrainStyle: String, CaseIterable {
     case standard
     case flyover
     case hybrid

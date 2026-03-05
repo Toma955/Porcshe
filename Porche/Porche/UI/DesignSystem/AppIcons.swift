@@ -9,6 +9,16 @@ enum AppIcons {
     static let settings = "Settings"
     static let backArrow = "BackArrow"
     static let start = "Start"
+    static let island = "Island"
+    static let moon = "Moon"
+    static let paths = "Paths"
+
+    /// Navigacijske strelice (Resources/Icons/Navigation → Assets).
+    static let turnLeft = "TurnLeft"
+    static let turnRight = "TurnRight"
+    static let forward = "Forward"
+    static let turnBack = "TurnBack"
+    static let compass = "Compass"
 
     /// SF Symbol fallback kad asset ne postoji.
     enum Symbol {
@@ -18,6 +28,14 @@ enum AppIcons {
         static let settings = "gearshape"
         static let backArrow = "chevron.left"
         static let start = "flag.fill"
+        static let island = "square.roundedbottomhalf.filled"
+        static let moon = "moon.fill"
+        static let paths = "point.topleft.down.curvedto.point.bottomright.up"
+        static let turnLeft = "arrow.turn.up.left"
+        static let turnRight = "arrow.turn.up.right"
+        static let forward = "arrow.up"
+        static let turnBack = "arrow.uturn.backward"
+        static let compass = "location.north.fill"
     }
 
     /// Vraća sliku iz Assets ili SF Symbol ako asset ne postoji (nazivi točno: Route, Graph, Bike, Settings, BackArrow).
@@ -35,6 +53,14 @@ enum AppIcons {
     static var imageSettings: Image { image(route: settings, symbol: Symbol.settings) }
     static var imageBackArrow: Image { image(route: backArrow, symbol: Symbol.backArrow) }
     static var imageStart: Image { image(route: start, symbol: Symbol.start) }
+    static var imageIsland: Image { image(route: island, symbol: Symbol.island) }
+    static var imageMoon: Image { image(route: moon, symbol: Symbol.moon) }
+    static var imagePaths: Image { image(route: paths, symbol: Symbol.paths) }
+    static var imageTurnLeft: Image { image(route: turnLeft, symbol: Symbol.turnLeft) }
+    static var imageTurnRight: Image { image(route: turnRight, symbol: Symbol.turnRight) }
+    static var imageForward: Image { image(route: forward, symbol: Symbol.forward) }
+    static var imageTurnBack: Image { image(route: turnBack, symbol: Symbol.turnBack) }
+    static var imageCompass: Image { image(route: compass, symbol: Symbol.compass) }
 }
 
 extension Image {

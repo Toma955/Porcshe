@@ -6,7 +6,7 @@ struct AssistModeSelector: View {
     var body: some View {
         Picker("Mode", selection: $selectedMode) {
             ForEach(AssistMode.allCases, id: \.self) { mode in
-                Text(mode.rawValue.capitalized).tag(mode)
+                Text(mode.displayTitle).tag(mode)
             }
         }
         .pickerStyle(.segmented)

@@ -45,7 +45,7 @@ enum RoutePlanningService {
                     return
                 }
                 let points = (0..<route.polyline.pointCount).map { i in
-                    MKCoordinateForMapPoint(route.polyline.points()[i])
+                    route.polyline.points()[i].coordinate
                 }
                 let model = RouteModel(
                     id: UUID(),

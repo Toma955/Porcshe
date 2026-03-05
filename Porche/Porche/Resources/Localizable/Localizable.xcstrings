@@ -13,6 +13,12 @@
     "▼" : {
 
     },
+    "2D" : {
+
+    },
+    "3D" : {
+
+    },
     "app.title" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -114,13 +120,13 @@
     "Manual" : {
 
     },
+    "Mod rada motora" : {
+
+    },
     "Mode" : {
 
     },
     "Motor Tuning" : {
-
-    },
-    "Nađi me" : {
 
     },
     "Nastavi" : {
@@ -160,6 +166,9 @@
 
     },
     "Postavke aplikacije i uređaja." : {
+
+    },
+    "Povratak: %@" : {
 
     },
     "Pre-ride" : {
@@ -221,6 +230,9 @@
 
     },
     "Weather" : {
+
+    },
+    "Zatvori" : {
 
     },
     "Završi" : {
