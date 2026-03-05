@@ -50,6 +50,11 @@ final class AppState: ObservableObject {
 
     /// Vožnja po noći: cijeli island i aplikacija u narančastoj temi (#FF4B33).
     @Published var isNightRidingMode: Bool = false
+
+    /// Statistika vožnje (live dashboard, telemetrija, staza, dijagnostika, povijest, pametni uvidi). Početno prazno (bez podataka).
+    @Published var rideStatistics: RideStatistics = RideStatistics()
+    /// Mapa (putanja) za spremanje izvještaja / statistike.
+    @Published var saveFolderPath: String = ""
 }
 
 enum OnboardingStep {

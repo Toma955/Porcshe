@@ -111,6 +111,8 @@ struct PorcheIslandView: View {
     var onFindMe: (() -> Void)? = nil
     var onCancelFindMe: (() -> Void)? = nil
     var onPokreniNavigaciju: ((Bool, String, String) -> Void)? = nil
+    /// Kad korisnik u vožnji stisne Island – povratak na početak (bicikl, rotacija).
+    var onExitRide: (() -> Void)? = nil
 
     private let collapsedHeight: CGFloat = 72
     private let iconSizeExpanded: CGFloat = 62
@@ -144,7 +146,6 @@ struct PorcheIslandView: View {
     @StateObject private var locationCompleter = LocationSearchCompleter()
     @FocusState private var focusedDestinationField: DestinationField?
     @State private var showModPicker = false
-
     private enum DestinationField {
         case origin, destination
     }
@@ -244,6 +245,7 @@ struct PorcheIslandView: View {
                             insertion: .move(edge: .bottom).combined(with: .opacity),
                             removal: .move(edge: .bottom).combined(with: .opacity)
                         ))
+                    Spacer(minLength: 0)
                 }
                 if !isExpanded || !isRideMapActive {
                     pillBar
@@ -289,7 +291,6 @@ struct PorcheIslandView: View {
                 appState.showMapControlsInIsland = false
                 island.state = .compact
             }
-            // Odgodi reset da se izbjegne "Modifying state during view update"
             DispatchQueue.main.async { island.requestClose = false }
         }
     }
@@ -307,9 +308,15 @@ struct PorcheIslandView: View {
         case .compact: return collapsedHeight
         case .actions:
             if isRideMapActive { return expandedHeightForRideMode }
+            if selectedButton == .graph || selectedButton == .bike || selectedButton == .settings { return expandedHeightForStatistics }
             return selectedButton != nil ? (expandedPillSectionHeight + 220) : expandedPillSectionHeight
         case .fullStats: return UIScreen.main.bounds.height * 0.85
         }
+    }
+
+    /// Visina islanda kad je otvoren panel Statistika / Katalog / Postavke (cijeli prikaz).
+    private var expandedHeightForStatistics: CGFloat {
+        UIScreen.main.bounds.height * 0.9 - 24
     }
 
     /// Fiksna visina u vožnji da sav sadržaj stane unutar crnog područja (brzina, panel, gumbi, donji red).
@@ -348,6 +355,7 @@ struct PorcheIslandView: View {
             if isRideMapActive, showModPicker { return expandedHeightForModePicker }
             if isRideMapActive, appState.showMapControlsInIsland { return expandedHeightForMapControls }
             if isRideMapActive { return expandedHeightForRideMode }
+            if selectedButton == .graph || selectedButton == .bike || selectedButton == .settings { return expandedHeightForStatistics }
             return selectedButton != nil ? (expandedPillSectionHeight + 220) : expandedPillSectionHeight
         case .fullStats: return UIScreen.main.bounds.height * 0.85
         }
@@ -394,8 +402,8 @@ struct PorcheIslandView: View {
     private let rideModeCircleButtonSize: CGFloat = 44
     /// Bijeli okrugli gumb „povratak” (strelica) – ista širina i visina za krug.
     private let rideModeChevronRoundSize: CGFloat = 52
-    /// Razmak između gumba u lijevoj i desnoj skupini – simetričan raspored.
-    private let rideModeButtonGap: CGFloat = 12
+    /// Jednak razmak između svih gumba u donjem redu i od rubova (Moon, Paths, chevron, Island, Mapa).
+    private let rideModeBarSpacing: CGFloat = 16
 
     /// Donji red u vožnji. Kad su upute aktivne: lijevo povećaj, sredina bijeli „natrag”, desno ulica/lokacija/smjer.
     private var rideModeBottomBar: some View {
@@ -437,7 +445,7 @@ struct PorcheIslandView: View {
                     .rotationEffect(.degrees(-navHeadingDegrees))
                     .padding(.bottom, 4)
             } else {
-                HStack(spacing: rideModeButtonGap) {
+                HStack(spacing: rideModeBarSpacing) {
                     Button {
                         appState.isNightRidingMode.toggle()
                     } label: {
@@ -462,26 +470,31 @@ struct PorcheIslandView: View {
                             .background(islandColors.buttonBg, in: Circle())
                     }
                     .buttonStyle(.plain)
-                }
-                Spacer(minLength: 0)
-                Button {
-                    withAnimation(islandSpring) {
-                        selectedButton = nil
-                        island.state = .compact
-                        showNavigationInstructionsInIsland = false
+                    Button {
+                        withAnimation(islandSpring) {
+                            selectedButton = nil
+                            island.state = .compact
+                            showNavigationInstructionsInIsland = false
+                        }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundStyle(.black)
+                            .frame(width: rideModeChevronRoundSize, height: rideModeChevronRoundSize)
+                            .background(Color.white, in: Circle())
+                            .contentShape(Circle())
                     }
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(.black)
-                        .frame(width: rideModeChevronRoundSize, height: rideModeChevronRoundSize)
-                        .background(Color.white, in: Circle())
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                Spacer(minLength: 0)
-                HStack(spacing: rideModeButtonGap) {
-                    Button { } label: {
+                    .buttonStyle(.plain)
+                    Button {
+                        onExitRide?()
+                        withAnimation(islandSpring) {
+                            appState.showMapControlsInIsland = false
+                            island.state = .compact
+                            showModPicker = false
+                            showNavigationInstructionsInIsland = false
+                            selectedButton = nil
+                        }
+                    } label: {
                         AppIcons.imageIsland
                             .resizable()
                             .scaledToFit()
@@ -489,6 +502,7 @@ struct PorcheIslandView: View {
                             .foregroundStyle(islandColors.title)
                             .frame(width: rideModeCircleButtonSize, height: rideModeCircleButtonSize)
                             .background(islandColors.buttonBg, in: Circle())
+                            .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
                     Button {
@@ -502,6 +516,8 @@ struct PorcheIslandView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                .padding(.horizontal, rideModeBarSpacing)
+                .frame(maxWidth: .infinity)
             }
         }
         .frame(height: rideModeBottomBarHeight)
@@ -981,7 +997,11 @@ struct PorcheIslandView: View {
     private var expandedContentHeight: CGFloat {
         switch island.state {
         case .compact: return 0
-        case .actions: return isRideMapActive ? 200 : 220
+        case .actions:
+            if selectedButton == .graph || selectedButton == .bike || selectedButton == .settings {
+                return expandedHeightForStatistics - expandedPillSectionHeight - 24 - 60
+            }
+            return isRideMapActive ? 200 : 220
         case .fullStats: return (UIScreen.main.bounds.height * 0.85) - expandedPillSectionHeight - 24
         }
     }
@@ -1171,42 +1191,251 @@ struct PorcheIslandView: View {
     }
 
     private var graphContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Statistika")
-                .font(AppTypography.headline)
-                .foregroundStyle(islandColors.titleGradient)
-            Text("Grafovi i statistika vožnje.")
-                .font(AppTypography.caption)
-                .foregroundStyle(islandColors.secondary)
+        VStack(spacing: 0) {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    statsSectionTitle("1. Live Dashboard")
+                    statsRow("Brzina", "—")
+                    statsRow("Baterija", "—")
+                    statsRow("Doseg", "—")
+                    statsRow("Mod", "—")
+                    statsRow("Prijenos", "—")
+                    statsRow("Prijeđeno (vožnja)", "—")
+                    statsRow("Vrijeme vožnje", "—")
+
+                    statsSectionTitle("2. Performanse (Telemetrija)")
+                    statsRow("Kadenca", "—")
+                    statsRow("Snaga vozača", "—")
+                    statsRow("Snaga motora", "—")
+                    statsRow("Okretni moment", "—")
+                    statsRow("Potrošnja", "—")
+                    statsRow("Prosječna brzina", "—")
+                    statsRow("Maks. brzina", "—")
+
+                    statsSectionTitle("3. Topografija i teren")
+                    statsRow("Nadmorska visina", "—")
+                    statsRow("Nagib", "—")
+                    statsRow("Ukupni uspon", "—")
+                    statsRow("Ukupni spust", "—")
+                    statsRow("Maks. nagib", "—")
+                    statsRow("VAM", "—")
+
+                    statsSectionTitle("4. Zdravlje sustava")
+                    statsRow("Temperatura motora", "—")
+                    statsRow("Temperatura baterije", "—")
+                    statsRow("Tlak guma", "—")
+                    statsRow("Zdravlje baterije (SOH)", "—")
+                    statsRow("Ciklusi punjenja", "—")
+                    statsRow("Do servisa", "—")
+
+                    statsSectionTitle("5. Povijest (tjedan / mjesec)")
+                    statsRow("Kilometraža (odometar)", "—")
+                    statsRow("Tjedni cilj", "—")
+                    statsRow("Ušteda CO2", "—")
+                    statsRow("Kalorije", "—")
+                    statsRow("Vrijeme u Eco", "—")
+                    statsRow("Vrijeme u Turbo", "—")
+
+                    statsSectionTitle("6. Pametni uvidi")
+                    statsRow("Preporučeni tlak", "—")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .padding(.bottom, 8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Mapa za spremanje")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(islandColors.secondary)
+                    Spacer(minLength: 8)
+                    Text(appState.saveFolderPath.isEmpty ? "Nije odabrano" : appState.saveFolderPath)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(islandColors.title)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(islandColors.buttonBg.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                Button {
+                    withAnimation(islandSpring) { selectedButton = nil }
+                } label: {
+                    Text("Spremi")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(islandColors.accentGreen, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 16)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var bikeContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Bicikl")
-                .font(AppTypography.headline)
-                .foregroundStyle(islandColors.titleGradient)
-            Text("Status bicikla, baterija, motor.")
-                .font(AppTypography.caption)
+    private func statsSectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(islandColors.accentGreen)
+            .padding(.top, 4)
+    }
+
+    private func statsRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(islandColors.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(islandColors.title)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.vertical, 4)
+    }
+
+    private let bikePartIconSize: CGFloat = 28
+
+    /// Katalog servisa: svi dijelovi prema vrhu, format „trenutno/cilj” (npr. 1200/1200).
+    private var bikeContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                Text("Katalog servisa")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(islandColors.title)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 12)
+                ForEach(AppIcons.Part.allCases, id: \.rawValue) { part in
+                    bikeCatalogRow(part: part)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func bikeCatalogRow(part: AppIcons.Part) -> some View {
+        HStack(spacing: 12) {
+            AppIcons.imagePart(part)
+                .resizable()
+                .scaledToFit()
+                .frame(width: bikePartIconSize, height: bikePartIconSize)
+                .foregroundStyle(islandColors.accentGreen)
+            Text(part.displayName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(islandColors.title)
+            Spacer(minLength: 8)
+            Text(bikeServiceText(for: part))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(islandColors.accentGreen)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(islandColors.buttonBg.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.bottom, 6)
+    }
+
+    /// Format „trenutno/cilj” po dijelu (npr. 1200/1200 km). Kasnije povezati na prave podatke.
+    private func bikeServiceText(for part: AppIcons.Part) -> String {
+        let unit = part == .batery ? " %" : " km"
+        switch part {
+        case .oil: return "1200/1200\(unit)"
+        case .brake: return "800/800\(unit)"
+        case .service: return "500/500\(unit)"
+        case .wheels: return "3000/3000\(unit)"
+        case .gears: return "2000/2000\(unit)"
+        case .suspension: return "1800/1800\(unit)"
+        case .batery: return "100/100 %"
+        case .engine: return "5000/5000\(unit)"
+        case .link: return "1500/1500\(unit)"
+        }
     }
 
     private var settingsContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Postavke")
-                .font(AppTypography.headline)
-                .foregroundStyle(islandColors.titleGradient)
-            Text("Postavke aplikacije i uređaja.")
-                .font(AppTypography.caption)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                settingsSection("1. Postavke bicikla (Bike Settings)") {
+                    settingsRow("Motor Tune (Eco, Trail, Sport, Turbo)")
+                    settingsRow("Max Support – postotak snage motora")
+                    settingsRow("Max Torque – limit okretnog momenta (Nm)")
+                    settingsRow("Start Gear – brzina pri pokretanju")
+                    settingsRow("Auto-Unlock (Bluetooth Proximity)")
+                    settingsRow("Light Settings – Auto / On / Off, jačina")
+                }
+                settingsSection("2. Navigacija i mape") {
+                    settingsRow("Map Style – Standard / Satellite / Hybrid")
+                    settingsRow("Route Preference – Najbrža / Zelena / Flat")
+                    settingsRow("Offline Maps – preuzimanje regija")
+                    settingsRow("Range Overlay – oblak dosega na karti")
+                }
+                settingsSection("3. Povezivost i senzori") {
+                    settingsRow("Sensor Management – Apple Watch, HRM, TPMS")
+                    settingsRow("Data Export – Strava, Apple Health, Komoot")
+                }
+                settingsSection("4. Servis i dijagnostika") {
+                    settingsRow("Component Log – datumi servisa komponenti")
+                    settingsRow("Firmware Update – motor i baterija")
+                    settingsRow("System Diagnostics – test senzora i elektronike")
+                    settingsRow("User Manual – digitalni priručnik")
+                }
+                settingsSection("5. Korisnički profil") {
+                    settingsRow("Biometrija – težina i visina vozača")
+                    settingsRow("Fitness Level – za izračun pomoći motora")
+                    settingsRow("Emergency Contact – broj pri Crash Detection")
+                }
+                settingsSection("6. Izgled i jedinice") {
+                    settingsRow("Theme – Light / Dark / Auto")
+                    settingsRow("Units – Metric (km, bar) / Imperial (miles, psi)")
+                    settingsRow("Haptic Feedback – vibracije pri kliku")
+                    settingsRow("Sound Effects – elektromehanički zvuk")
+                }
+                settingsSection("7. Privatnost i sigurnost") {
+                    settingsRow("Bike PIN – otključavanje na biciklu")
+                    settingsRow("Find My Bike – GPS u slučaju krađe")
+                    settingsRow("Biometric App Lock – Face ID / Touch ID")
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func settingsSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(islandColors.accentGreen)
+            VStack(spacing: 0) {
+                content()
+            }
+        }
+    }
+
+    private func settingsRow(_ label: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(islandColors.title)
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(islandColors.secondary)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(islandColors.buttonBg.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.bottom, 4)
     }
 
 }

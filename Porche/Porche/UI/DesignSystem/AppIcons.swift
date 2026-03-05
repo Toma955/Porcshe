@@ -20,6 +20,61 @@ enum AppIcons {
     static let turnBack = "TurnBack"
     static let compass = "Compass"
 
+    /// Dijelovi bicikla (Resources/Icons/parts) – za prikaz kad korisnik klikne na Bike.
+    enum Part: String, CaseIterable {
+        case oil
+        case brake
+        case service
+        case wheels
+        case gears
+        case suspension
+        case batery
+        case engine
+        case link
+        var displayName: String {
+            switch self {
+            case .oil: return "Ulje"
+            case .brake: return "Kočnice"
+            case .service: return "Servis"
+            case .wheels: return "Kotači"
+            case .gears: return "Mjenjač"
+            case .suspension: return "Ovjes"
+            case .batery: return "Baterija"
+            case .engine: return "Elektromotor"
+            case .link: return "Lanac"
+            }
+        }
+    }
+
+    /// Točna imena u folderu: oil, brake, service, wheels, gears, suspension, batery, engine, link (.png)
+    private static let partsRelPaths = [
+        "Resources/Icons/parts",
+        "Porche/Resources/Icons/parts",
+        "Icons/parts",
+        "parts",
+    ]
+
+    /// Ikona dijela (template) – učitava iz bundlea; nikad UIImage(named:) da ne ide u asset catalog i ne logira grešku.
+    static func imagePart(_ part: Part) -> Image {
+        let name = part.rawValue
+        let bundle = Bundle.main
+        let base = bundle.bundlePath as NSString
+        for rel in partsRelPaths {
+            let path = base.appendingPathComponent("\(rel)/\(name).png")
+            if FileManager.default.fileExists(atPath: path), let ui = UIImage(contentsOfFile: path) {
+                return Image(uiImage: ui).renderingMode(.template)
+            }
+        }
+        let subdirs: [String?] = ["Resources/Icons/parts", "Icons/parts", "parts", nil]
+        for subdir in subdirs {
+            if let p = bundle.path(forResource: name, ofType: "png", inDirectory: subdir),
+               let ui = UIImage(contentsOfFile: p) {
+                return Image(uiImage: ui).renderingMode(.template)
+            }
+        }
+        return Image(systemName: "wrench.and.screwdriver").renderingMode(.template)
+    }
+
     /// SF Symbol fallback kad asset ne postoji.
     enum Symbol {
         static let route = "map"

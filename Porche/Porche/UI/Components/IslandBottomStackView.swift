@@ -8,6 +8,8 @@ struct IslandBottomStackView: View {
     var onFindMe: (() -> Void)? = nil
     var onCancelFindMe: (() -> Void)? = nil
     var onPokreniNavigaciju: ((Bool, String, String) -> Void)? = nil
+    /// Poziva se kad korisnik u vožnji stisne Island (povratak na početak) – reset vožnje i prikaza bicikla.
+    var onExitRide: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,7 +20,8 @@ struct IslandBottomStackView: View {
                 isFindMeMode: isFindMeMode,
                 onFindMe: onFindMe,
                 onCancelFindMe: onCancelFindMe,
-                onPokreniNavigaciju: onPokreniNavigaciju
+                onPokreniNavigaciju: onPokreniNavigaciju,
+                onExitRide: onExitRide
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)

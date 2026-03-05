@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
@@ -78,6 +79,16 @@ struct ContentView: View {
                         locationManager.requestLocation()
                         locationManager.startUpdatingLocation()
                     }
+                },
+                onExitRide: {
+                    appState.isRouteActive = false
+                    appState.activeRoute = nil
+                    appState.isNavigationActive = false
+                    appState.isFindMeMode = false
+                    appState.showMapControlsInIsland = false
+                    appState.mapHeading = 0
+                    appState.mapCameraDistance = 500
+                    appState.mapCenter = CLLocationCoordinate2D(latitude: 45.8129, longitude: 15.9775)
                 }
             )
         }

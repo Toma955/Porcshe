@@ -60,9 +60,6 @@
     "Battery" : {
 
     },
-    "Bicikl" : {
-
-    },
     "Charging" : {
 
     },
@@ -96,13 +93,13 @@
     "Garage" : {
 
     },
-    "Grafovi i statistika vožnje." : {
-
-    },
     "Graphics" : {
 
     },
     "Heatmap" : {
+
+    },
+    "Katalog servisa" : {
 
     },
     "Konzola (%lld)" : {
@@ -118,6 +115,9 @@
 
     },
     "Manual" : {
+
+    },
+    "Mapa za spremanje" : {
 
     },
     "Mod rada motora" : {
@@ -160,12 +160,6 @@
 
     },
     "Post-ride" : {
-
-    },
-    "Postavke" : {
-
-    },
-    "Postavke aplikacije i uređaja." : {
 
     },
     "Povratak: %@" : {
@@ -220,13 +214,10 @@
     "Settings" : {
 
     },
-    "Statistika" : {
+    "Spremi" : {
 
     },
     "Stats" : {
-
-    },
-    "Status bicikla, baterija, motor." : {
 
     },
     "Weather" : {

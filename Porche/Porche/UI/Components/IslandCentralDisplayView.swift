@@ -62,6 +62,7 @@ struct IslandCentralDisplayView: View {
             mapOrBackgroundView
             bikeOverlayView
         }
+        .id(appState.isRouteActive)
     }
 
     @ViewBuilder
@@ -93,6 +94,7 @@ struct IslandCentralDisplayView: View {
             } else {
                 Spacer(minLength: 16)
                 bikeView(width: normalBikeWidth, height: normalBikeHeight, findMeMode: false)
+                    .id("bike-home")
                 Spacer(minLength: 220)
             }
         }

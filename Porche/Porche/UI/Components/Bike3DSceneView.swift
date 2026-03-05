@@ -52,7 +52,7 @@ struct Bike3DSceneView: UIViewRepresentable {
         if let cached = SceneCache.shared.scene {
             AppDebugLog.shared.log("3D OK – scena iz cachea")
             sceneView.scene = cached
-                coordinator.applyRotation(to: sceneView.scene?.rootNode, speed: coordinator.rotationSpeed)
+            coordinator.applyRotation(to: sceneView.scene?.rootNode, speed: coordinator.rotationSpeed)
             if coordinator.isFindMeMode, let view = coordinator.sceneView {
                 coordinator.applyFindMeCamera(to: view)
             }
