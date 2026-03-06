@@ -67,10 +67,13 @@ private func routeBearing(at progress: Double, along waypoints: [CLLocationCoord
     if deg < 0 { deg += 360 }
     return deg
 }
+
+private let bikeModelForwardOffset: Double = 0
 struct IslandCentralDisplayView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var locationManager: LocationManager
     @State private var isBikeSceneReady = false
+    @State private var homeBikeKey = 0
     @State private var mapCameraPosition: MapCameraPosition = .camera(
         MapCamera(
             centerCoordinate: CLLocationCoordinate2D(latitude: 45.8129, longitude: 15.9775),
@@ -89,6 +92,7 @@ struct IslandCentralDisplayView: View {
             )
         )
     }
+
     var body: some View {
         contentWithLayout
             .modifier(IslandCentralMapModifier(
@@ -103,6 +107,9 @@ struct IslandCentralDisplayView: View {
                       let pos = coordinate(at: progress, along: route.waypoints) else { return }
                 appState.mapCenter = pos
                 syncMapPositionFromAppState()
+            }
+            .onChange(of: appState.isRouteActive) { _, active in
+                if !active { homeBikeKey += 1 }
             }
     }
     private var contentWithLayout: some View {
@@ -139,24 +146,42 @@ struct IslandCentralDisplayView: View {
                 .transition(.opacity.animation(.easeInOut(duration: routeTransitionDuration)))
         }
     }
+    private let welcomeTransitionDuration: Double = 0.5
+
     @ViewBuilder
     private var bikeOverlayView: some View {
         let routeHasWaypoints = (appState.activeRoute?.waypoints.isEmpty ?? true) == false
-        VStack(spacing: 0) {
+        ZStack {
             if appState.isRouteActive {
-                if !routeHasWaypoints {
-                    Spacer(minLength: 0)
-                    bikeView(width: mapBikeWidth, height: mapBikeHeight, findMeMode: true)
-                    Spacer(minLength: 0)
+                VStack(spacing: 0) {
+                    if !routeHasWaypoints {
+                        Spacer(minLength: 0)
+                        bikeView(width: mapBikeWidth, height: mapBikeHeight, findMeMode: true)
+                        Spacer(minLength: 0)
+                    }
                 }
+                .animation(bikeSpring, value: appState.isRouteActive)
             } else {
-                Spacer(minLength: 12)
-                bikeView(width: normalBikeWidth, height: normalBikeHeight, findMeMode: false)
-                    .id("bike-home-rotating")
-                Spacer(minLength: 60)
+                ZStack {
+                    Color.white
+                        .ignoresSafeArea()
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 12)
+                        bikeView(width: normalBikeWidth, height: normalBikeHeight, findMeMode: false)
+                            .id(homeBikeKey)
+                            .opacity(appState.hasCompletedAppWelcome ? 1 : 0)
+                        Spacer(minLength: 60)
+                    }
+                    Image("Porche")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 220, maxHeight: 220)
+                        .opacity(appState.hasCompletedAppWelcome ? 0 : 1)
+                        .allowsHitTesting(false)
+                }
+                .animation(.easeOut(duration: welcomeTransitionDuration), value: appState.hasCompletedAppWelcome)
             }
         }
-        .animation(bikeSpring, value: appState.isRouteActive)
         .allowsHitTesting(!appState.mapPanningEnabled)
     }
     private func syncMapPositionFromAppState() {
@@ -168,12 +193,12 @@ struct IslandCentralDisplayView: View {
         let heading = appState.mapHeading
         var items: [GhostBikeItem] = []
         if let pos1 = coordinate(at: progress, along: waypoints) {
-            let angle1 = routeBearing(at: progress, along: waypoints) - heading
+            let angle1 = routeBearing(at: progress, along: waypoints) - heading + bikeModelForwardOffset
             items.append(GhostBikeItem(id: 0, coordinate: pos1, opacity: 0.7, angle: angle1))
         }
         let progress2 = min(1, progress + 0.08)
         if progress < 1, let pos2 = coordinate(at: progress2, along: waypoints) {
-            let angle2 = routeBearing(at: progress2, along: waypoints) - heading
+            let angle2 = routeBearing(at: progress2, along: waypoints) - heading + bikeModelForwardOffset
             items.append(GhostBikeItem(id: 1, coordinate: pos2, opacity: 0.4, angle: angle2))
         }
         return items
@@ -185,7 +210,7 @@ struct IslandCentralDisplayView: View {
         if waypoints.count >= 2,
            let pos = coordinate(at: progress, along: waypoints) {
             let bearing = routeBearing(at: progress, along: waypoints)
-            let bikeAngle = bearing - appState.mapHeading
+            let bikeAngle = bearing - appState.mapHeading + bikeModelForwardOffset
             Annotation("", coordinate: pos) {
                 routeBike3D(size: 148, opacity: 0.82, angle: bikeAngle)
             }
@@ -197,6 +222,7 @@ struct IslandCentralDisplayView: View {
             .opacity(opacity)
             .rotationEffect(.degrees(angle))
     }
+
     private func ghostBikeMarker(opacity: Double, angle: Double) -> some View {
         routeBike3D(size: 72, opacity: opacity * 0.88, angle: angle)
     }
@@ -213,40 +239,34 @@ struct IslandCentralDisplayView: View {
         }
     }
     private var mapWithBinding: some View {
-        MapReader { proxy in
-            ZStack {
-                Map(position: $mapCameraPosition) {
-                    UserAnnotation()
-                    if let route = appState.activeRoute, !route.waypoints.isEmpty {
-                        MapPolyline(coordinates: route.waypoints)
-                            .stroke(.blue, lineWidth: 6)
-                        ForEach(ghostBikeItems(route: route, progress: appState.routeProgressAlongLine)) { item in
-                            Annotation("", coordinate: item.coordinate) {
-                                ghostBikeMarker(opacity: item.opacity, angle: item.angle)
-                            }
-                        }
+        Map(position: $mapCameraPosition) {
+            UserAnnotation()
+            if let route = appState.activeRoute, !route.waypoints.isEmpty {
+                MapPolyline(coordinates: route.waypoints)
+                    .stroke(.blue, lineWidth: 6)
+                ForEach(ghostBikeItems(route: route, progress: appState.routeProgressAlongLine)) { item in
+                    Annotation("", coordinate: item.coordinate) {
+                        ghostBikeMarker(opacity: item.opacity, angle: item.angle)
                     }
                 }
-                .onMapCameraChange(frequency: .onEnd) { context in
+                if let bikeCoord = coordinate(at: appState.routeProgressAlongLine, along: route.waypoints) {
+                    let bearing = routeBearing(at: appState.routeProgressAlongLine, along: route.waypoints)
+                    let angleDegrees = bearing - appState.mapHeading + bikeModelForwardOffset
+                    let angleRounded = (angleDegrees / 5).rounded() * 5
+                    Annotation("", coordinate: bikeCoord) {
+                        routeBike3D(size: 148, opacity: 0.82, angle: angleRounded)
+                            .frame(width: 148, height: 148)
+                            .allowsHitTesting(false)
+                            .id("main-route-bike")
+                    }
+                }
+            }
+        }
+        .onMapCameraChange(frequency: .onEnd) { context in
                     appState.mapCenter = context.camera.centerCoordinate
                     appState.mapCameraDistance = context.camera.distance
                     appState.mapHeading = context.camera.heading
                 }
-                mainBikeOverlay(proxy: proxy)
-            }
-        }
-    }
-    @ViewBuilder
-    private func mainBikeOverlay(proxy: MapProxy) -> some View {
-        if let route = appState.activeRoute, route.waypoints.count >= 2,
-           let bikeCoord = coordinate(at: appState.routeProgressAlongLine, along: route.waypoints),
-           let bikePoint = proxy.convert(bikeCoord, to: .local) {
-            let angle = routeBearing(at: appState.routeProgressAlongLine, along: route.waypoints) - appState.mapHeading
-            routeBike3D(size: 148, opacity: 0.82, angle: angle)
-                .frame(width: 148, height: 148)
-                .position(bikePoint)
-                .allowsHitTesting(false)
-        }
     }
     private func fitCameraToRoute(_ waypoints: [CLLocationCoordinate2D]) {
         guard waypoints.count >= 2 else { return }
@@ -332,9 +352,9 @@ private struct IslandCentralMapModifier: ViewModifier {
         view
             .onChange(of: appState.activeRoute) { _, newRoute in
                 if let route = newRoute, !route.waypoints.isEmpty {
-                    onFitRoute(route.waypoints)
                     appState.mapCenter = route.waypoints[0]
-                    appState.mapCameraDistance = 600
+                    appState.mapCameraDistance = 420
+                    appState.mapHeading = 0
                     appState.routeProgressAlongLine = 0
                     DispatchQueue.main.async { onSync() }
                 }

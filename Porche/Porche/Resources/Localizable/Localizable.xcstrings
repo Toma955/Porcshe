@@ -1,7 +1,13 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
     "—" : {
+
+    },
+    "[%@]" : {
 
     },
     "%lld / %lld" : {
@@ -39,6 +45,9 @@
 
     },
     "3D" : {
+
+    },
+    "App" : {
 
     },
     "app.title" : {
@@ -94,6 +103,9 @@
     "Create Route" : {
 
     },
+    "Dev" : {
+
+    },
     "Di2 Config" : {
 
     },
@@ -119,6 +131,9 @@
 
     },
     "Elevation Route" : {
+
+    },
+    "Exit mode" : {
 
     },
     "Firmware Update" : {
@@ -169,10 +184,19 @@
     "Nastavi" : {
 
     },
+    "Nema poruka" : {
+
+    },
     "Notifications" : {
 
     },
     "Otkucaj srca" : {
+
+    },
+    "Otvori" : {
+
+    },
+    "Otvori postavke sustava" : {
 
     },
     "Pair your bike" : {
@@ -190,7 +214,13 @@
     "Poništi" : {
 
     },
+    "Porche" : {
+
+    },
     "Porche Ebike" : {
+
+    },
+    "Porche Ebike spojen" : {
 
     },
     "Porsche Account" : {
@@ -276,6 +306,9 @@
 
     },
     "Zatvori" : {
+
+    },
+    "Zatvori app" : {
 
     },
     "Završi" : {

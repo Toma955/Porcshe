@@ -2,7 +2,6 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
-/// Dynamic Island — 3 stanja
 struct LiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: EBikeAttributes.self) { context in

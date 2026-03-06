@@ -37,7 +37,40 @@ final class AppState: ObservableObject {
     @Published var heartRateBPM: Int? = 72
     @Published var rideStatistics: RideStatistics = RideStatistics()
     @Published var saveFolderPath: String = ""
+    @Published var isDemoMode: Bool = false
+    @Published var devMessages: [DevMessage] = []
+    /// When false, central display shows Porche logo until user completes "App" welcome (message + sound + 3D).
+    @Published var hasCompletedAppWelcome: Bool = false
+    /// When true, island shows "Porche EBike spojen" during App entry sequence.
+    @Published var isShowingAppWelcomeMessage: Bool = false
+    var demoSimulationTask: Task<Void, Never>?
+    private let devMessagesMaxCount = 100
+
+    func addDevMessage(category: DevMessageCategory, _ text: String) {
+        let entry = DevMessage(category: category, text: text, date: Date())
+        devMessages = Array([entry] + devMessages.prefix(devMessagesMaxCount - 1))
+    }
+
+    func clearDevMessages() {
+        devMessages = []
+    }
 }
+
+struct DevMessage: Identifiable {
+    let id = UUID()
+    let category: DevMessageCategory
+    let text: String
+    let date: Date
+}
+
+enum DevMessageCategory: String, CaseIterable {
+    case general = "Općenito"
+    case network = "Mreža"
+    case bluetooth = "Bluetooth"
+    case navigation = "Navigacija"
+    case demo = "Demo"
+}
+
 enum OnboardingStep {
     case bikeModel
     case welcome

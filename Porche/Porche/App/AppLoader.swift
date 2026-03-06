@@ -24,6 +24,7 @@ final class AppLoader {
                 return
             }
 
+            let start = Date()
             appState.loadingProgress = 0.1
             try? await Task.sleep(nanoseconds: 100_000_000)
 
@@ -34,9 +35,16 @@ final class AppLoader {
             }
 
             appState.loadingProgress = 0.85
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            let elapsed = Date().timeIntervalSince(start)
+            if elapsed < 1.0 {
+                try? await Task.sleep(nanoseconds: UInt64((1.0 - elapsed) * 1_000_000_000))
+            }
 
             appState.loadingProgress = 1.0
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await MainActor.run {
+                appState.isAppReady = true
+            }
         }
     }
 }

@@ -1,7 +1,6 @@
 import WidgetKit
 import SwiftUI
 
-/// Brzina, baterija, domet
 struct LockScreenWidget: Widget {
     let kind: String = "LockScreenWidget"
 

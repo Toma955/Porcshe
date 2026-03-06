@@ -45,6 +45,19 @@ struct ContentView: View {
                 appState.isRouteActive = true
                 if withNavigation, !origin.isEmpty, !destination.isEmpty {
                     appState.isNavigationActive = true
+                    if appState.isDemoMode {
+                        Task { @MainActor in
+                            guard let route = await RoutePlanningService.planRoute(
+                                origin: DemoRideSimulation.startCoordinate,
+                                destination: DemoRideSimulation.endCoordinate
+                            ) else { return }
+                            appState.activeRoute = route
+                            appState.routeProgressAlongLine = 0
+                            appState.mapCenter = route.waypoints.first ?? appState.mapCenter
+                            DemoRideSimulation.startSimulation(appState: appState, durationMinutes: 20)
+                        }
+                        return
+                    }
                     Task { @MainActor in
                         let start = await RoutePlanningService.coordinate(
                             for: origin,
@@ -69,6 +82,8 @@ struct ContentView: View {
                 }
             },
             onExitRide: {
+                appState.demoSimulationTask?.cancel()
+                appState.demoSimulationTask = nil
                 appState.isRouteActive = false
                 appState.activeRoute = nil
                 appState.routeProgressAlongLine = 0
@@ -93,17 +108,19 @@ private struct MainScreenRevealView: View {
     var onPokreniNavigaciju: (Bool, String, String) -> Void
     var onExitRide: () -> Void
 
-    @State private var revealed = false
+    @State private var islandRevealed = false
+    @State private var barAppeared = false
+    @State private var barHidden = false
 
-    private let zoomDuration: Double = 0.65
-    private let initialScale: CGFloat = 0.35
+    private let barEntranceDelay: Double = 0.4
+    private let barEntranceDuration: Double = 0.5
+    private let barExitDuration: Double = 0.55
+    private let holdAtFullDuration: Double = 0.2
+    private let islandRevealDuration: Double = 0.6
 
     var body: some View {
         ZStack(alignment: .bottom) {
             IslandCentralDisplayView()
-                .scaleEffect(revealed ? 1 : initialScale)
-                .opacity(revealed ? 1 : 0)
-                .animation(.easeOut(duration: zoomDuration), value: revealed)
             if appState.island.isExpanded {
                 Color.black.opacity(0.001)
                     .ignoresSafeArea()
@@ -111,26 +128,89 @@ private struct MainScreenRevealView: View {
                         appState.island.requestClose = true
                     }
             }
-            IslandBottomStackView(
-                island: island,
-                isMapVisible: isRouteActive,
-                isFindMeMode: isFindMeMode,
-                onFindMe: onFindMe,
-                onCancelFindMe: onCancelFindMe,
-                onPokreniNavigaciju: onPokreniNavigaciju,
-                onExitRide: onExitRide
-            )
-            .scaleEffect(revealed ? 1 : initialScale, anchor: .bottom)
-            .opacity(revealed ? 1 : 0)
-            .animation(.easeOut(duration: zoomDuration).delay(0.08), value: revealed)
+            if appState.isAppReady {
+                IslandBottomStackView(
+                    island: island,
+                    isMapVisible: isRouteActive,
+                    isFindMeMode: isFindMeMode,
+                    onFindMe: onFindMe,
+                    onCancelFindMe: onCancelFindMe,
+                    onPokreniNavigaciju: onPokreniNavigaciju,
+                    onExitRide: onExitRide
+                )
+                .offset(y: islandRevealed ? 0 : 36)
+                .opacity(islandRevealed ? 1 : 0)
+                .animation(.easeOut(duration: islandRevealDuration), value: islandRevealed)
+            } else {
+                loadingProgressOverlay
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all)
         .onAppear {
-            withAnimation(.easeOut(duration: zoomDuration)) {
-                revealed = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + barEntranceDelay) {
+                withAnimation(.easeOut(duration: barEntranceDuration)) {
+                    barAppeared = true
+                }
+            }
+            if appState.isAppReady || appState.loadingProgress >= 1.0 {
+                appState.isAppReady = true
+                withAnimation(.easeOut(duration: islandRevealDuration)) {
+                    islandRevealed = true
+                }
             }
         }
+        .onChange(of: appState.loadingProgress) { _, p in
+            if p >= 1.0, !appState.isAppReady {
+                DispatchQueue.main.asyncAfter(deadline: .now() + holdAtFullDuration) {
+                    withAnimation(.easeOut(duration: barExitDuration)) {
+                        barHidden = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + barExitDuration + 0.08) {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            appState.isAppReady = true
+                        }
+                        withAnimation(.easeOut(duration: islandRevealDuration)) {
+                            islandRevealed = true
+                        }
+                    }
+                }
+            }
+        }
+        .onChange(of: appState.isAppReady) { _, ready in
+            if ready, !islandRevealed {
+                withAnimation(.easeOut(duration: islandRevealDuration)) {
+                    islandRevealed = true
+                }
+            }
+        }
+    }
+
+    private var loadingProgressOverlay: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            GeometryReader { geo in
+                let width = min(geo.size.width, 240)
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.black.opacity(0.12))
+                        .frame(height: 3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.black)
+                        .frame(width: max(0, width * appState.loadingProgress), height: 3)
+                        .animation(.easeInOut(duration: 0.28), value: appState.loadingProgress)
+                }
+                .frame(width: width, height: 3, alignment: .leading)
+                .frame(maxWidth: .infinity)
+            }
+            .frame(height: 3)
+            .padding(.horizontal, 60)
+            .padding(.bottom, 60)
+            .opacity(barAppeared && !barHidden ? 1 : 0)
+            .animation(.easeOut(duration: barEntranceDuration), value: barAppeared)
+            .animation(.easeOut(duration: barExitDuration), value: barHidden)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

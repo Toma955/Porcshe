@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import UIKit
 private let islandSpring = Animation.spring(response: 0.35, dampingFraction: 0.82)
 private let islandSpringContent = Animation.spring(response: 0.4, dampingFraction: 0.8)
 private let expandedContentTransition = AnyTransition.asymmetric(
@@ -120,7 +121,7 @@ struct PorcheIslandView: View {
     var onExitRide: (() -> Void)? = nil
     private let collapsedHeight: CGFloat = 88
     private let iconSizeExpanded: CGFloat = 62
-    private var expandedPillSectionHeight: CGFloat { iconSizeExpanded + 28 }
+    private var expandedPillSectionHeight: CGFloat { iconSizeExpanded + 26 }
     private let horizontalPadding: CGFloat = 20
     private let cornerRadius: CGFloat = 40
     @State private var showButtonsContent = false
@@ -144,6 +145,7 @@ struct PorcheIslandView: View {
     }
     @State private var pillPageIndex: Int = 0
     @State private var pillDragOffset: CGFloat = 0
+    @State private var showAppDevChoice = false
     private var isExpanded: Bool { island.state != .compact }
     private var hasRouteDestinations: Bool { !routeOrigin.isEmpty || !routeDestination.isEmpty }
     private var isRideMapActive: Bool { appState.isRouteActive }
@@ -291,6 +293,7 @@ struct PorcheIslandView: View {
                     if island.state != .compact { showButtonsContent = true }
                 }
             } else {
+                showAppDevChoice = false
                 resetExpandedState()
             }
         }
@@ -330,13 +333,14 @@ struct PorcheIslandView: View {
         showButtonsContent = false
         selectedButton = nil
         showModPicker = false
+        showAppDevChoice = false
         appState.showMapControlsInIsland = false
         showNavigationInstructionsInIsland = false
     }
     private var islandWidth: CGFloat {
         switch island.state {
         case .compact: return UIScreen.main.bounds.width - horizontalPadding * 2
-        case .actions: return 400
+        case .actions: return 392
         case .fullStats: return UIScreen.main.bounds.width - horizontalPadding * 2
         }
     }
@@ -394,24 +398,89 @@ struct PorcheIslandView: View {
         Group {
             if isExpanded {
                 if !isRideMapActive {
-                    islandIconRow
-                }
-            } else {
-                ZStack {
-                    swipeablePillContent
-                    if !isRideMapActive && pillPageIndex == 0 {
-                        Text(Island.defaultTitle)
-                            .font(AppTypography.headline)
-                            .foregroundStyle(islandColors.titleGradient)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: collapsedHeight)
-                            .allowsHitTesting(false)
+                    if appState.isShowingAppWelcomeMessage {
+                        appWelcomeMessageRow
+                    } else if showAppDevChoice {
+                        appDevChoiceRow
+                    } else {
+                        islandIconRow
                     }
                 }
+            } else {
+                swipeablePillContent
             }
         }
         .padding(.vertical, isExpanded ? 14 : 0)
         .padding(.horizontal, isExpanded ? iconRowGap : 20)
+    }
+
+    private var appWelcomeMessageRow: some View {
+        Text("Porche Ebike spojen")
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(islandColors.title)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .opacity(appState.isShowingAppWelcomeMessage ? 1 : 0)
+    }
+
+    private let appDevButtonWidth: CGFloat = 100
+    private let appDevButtonHeight: CGFloat = 40
+
+    private var appDevChoiceRow: some View {
+        HStack(spacing: 16) {
+            Button {
+                appState.isShowingAppWelcomeMessage = true
+                WelcomeSoundService.playWelcomeSound()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(islandSpring) {
+                        appState.hasCompletedAppWelcome = true
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
+                    withAnimation(islandSpring) {
+                        appState.isShowingAppWelcomeMessage = false
+                        showAppDevChoice = false
+                    }
+                }
+            } label: {
+                Text("App")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: appDevButtonWidth, height: appDevButtonHeight)
+                    .background(islandColors.accentGreen, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            Button {
+                appState.isDemoMode = true
+                appState.isShowingAppWelcomeMessage = true
+                WelcomeSoundService.playWelcomeSound()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    withAnimation(islandSpring) {
+                        appState.hasCompletedAppWelcome = true
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                    withAnimation(islandSpring) {
+                        appState.isShowingAppWelcomeMessage = false
+                        showAppDevChoice = false
+                    }
+                    runDevModeFlow()
+                }
+            } label: {
+                Text("Dev")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: appDevButtonWidth, height: appDevButtonHeight)
+                    .background(islandColors.buttonBg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(islandColors.border, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .opacity(showAppDevChoice ? 1 : 0)
     }
     private let minPillContentWidth: CGFloat = 280
     private var swipeablePillContent: some View {
@@ -432,7 +501,12 @@ struct PorcheIslandView: View {
             .clipped()
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation(islandSpring) { island.state = .actions }
+                withAnimation(islandSpring) {
+                    if !appState.hasCompletedAppWelcome {
+                        showAppDevChoice = true
+                    }
+                    island.state = .actions
+                }
             }
         }
         .frame(height: collapsedHeight)
@@ -460,11 +534,44 @@ struct PorcheIslandView: View {
         }
     }
     private var pillDefaultPorche: some View {
-        Text(Island.defaultTitle)
-            .font(AppTypography.headline)
-            .foregroundStyle(islandColors.titleGradient)
-            .frame(maxWidth: .infinity)
-            .frame(height: collapsedHeight)
+        VStack(spacing: 6) {
+            Text(appState.hasCompletedAppWelcome ? "Porche Ebike" : "Porche")
+                .font(AppTypography.headline)
+                .foregroundStyle(islandColors.titleGradient)
+            if appState.isDemoMode {
+                devMessagesStrip
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: collapsedHeight)
+        .padding(.vertical, appState.isDemoMode && !appState.devMessages.isEmpty ? 8 : 0)
+    }
+
+    private var devMessagesStrip: some View {
+        Group {
+            if appState.devMessages.isEmpty {
+                Text("Nema poruka")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(islandColors.secondary)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(appState.devMessages) { msg in
+                            HStack(alignment: .top, spacing: 6) {
+                                Text("[\(msg.category.rawValue)]")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(islandColors.accentGreen)
+                                Text(msg.text)
+                                    .font(.system(size: 10, weight: .regular))
+                                    .foregroundStyle(islandColors.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 72)
+            }
+        }
     }
     private var pillTemperaturesView: some View {
         HStack(spacing: 12) {
@@ -1467,9 +1574,78 @@ struct PorcheIslandView: View {
         case .link: return "1500/1500\(unit)"
         }
     }
+    private func runDevModeFlow() {
+        Task { @MainActor in
+            withAnimation(islandSpring) { selectedButton = .route }
+            try? await Task.sleep(for: .milliseconds(500))
+            let origin = "Trg Bana Jelačića"
+            routeOrigin = ""
+            for c in origin {
+                routeOrigin += String(c)
+                try? await Task.sleep(for: .milliseconds(45))
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            let dest = "Jarun Park"
+            routeDestination = ""
+            for c in dest {
+                routeDestination += String(c)
+                try? await Task.sleep(for: .milliseconds(45))
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+            onPokreniNavigaciju?(true, routeOrigin, routeDestination)
+        }
+    }
     private var settingsContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
+                settingsSection("Exit") {
+                    Button {
+                        exit(0)
+                    } label: {
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.system(size: 14))
+                                .foregroundStyle(islandColors.accentGreen)
+                            Text("Exit mode")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(islandColors.title)
+                            Spacer(minLength: 8)
+                            Text("Zatvori app")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(islandColors.accentGreen)
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
+                        .background(islandColors.buttonBg.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .padding(.bottom, 4)
+                    }
+                    .buttonStyle(.plain)
+                }
+                settingsSection("Sistemske postavke") {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "gear")
+                                .font(.system(size: 14))
+                                .foregroundStyle(islandColors.accentGreen)
+                            Text("Otvori postavke sustava")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(islandColors.title)
+                            Spacer(minLength: 8)
+                            Text("Otvori")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(islandColors.accentGreen)
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 12)
+                        .background(islandColors.buttonBg.opacity(0.6), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .padding(.bottom, 4)
+                    }
+                    .buttonStyle(.plain)
+                }
                 settingsSection("1. Postavke bicikla (Bike Settings)") {
                     settingsRow("Motor Tune (Eco, Trail, Sport, Turbo)")
                     settingsRow("Max Support – postotak snage motora")
@@ -1535,6 +1711,21 @@ struct PorcheIslandView: View {
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(islandColors.secondary)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(islandColors.buttonBg.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.bottom, 4)
+    }
+    private func settingsToggleRow(_ label: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(islandColors.title)
+            Spacer(minLength: 8)
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(islandColors.accentGreen)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
