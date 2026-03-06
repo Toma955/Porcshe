@@ -56,10 +56,14 @@ private func routeBearing(at progress: Double, along waypoints: [CLLocationCoord
     let p2 = progress + eps
     guard let c1 = coordinate(at: max(0, p1), along: waypoints),
           let c2 = coordinate(at: min(1, p2), along: waypoints) else { return 0 }
-    let lat1 = c1.latitude * .pi / 180
-    let lon1 = c1.longitude * .pi / 180
-    let lat2 = c2.latitude * .pi / 180
-    let lon2 = c2.longitude * .pi / 180
+    return bearing(from: c1, to: c2)
+}
+
+private func bearing(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
+    let lat1 = from.latitude * .pi / 180
+    let lon1 = from.longitude * .pi / 180
+    let lat2 = to.latitude * .pi / 180
+    let lon2 = to.longitude * .pi / 180
     let dLon = lon2 - lon1
     let y = sin(dLon) * cos(lat2)
     let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
@@ -67,6 +71,28 @@ private func routeBearing(at progress: Double, along waypoints: [CLLocationCoord
     if deg < 0 { deg += 360 }
     return deg
 }
+
+private func totalRouteLengthMeters(waypoints: [CLLocationCoordinate2D]) -> Double {
+    guard waypoints.count >= 2 else { return 0 }
+    var total: Double = 0
+    for i in 0..<(waypoints.count - 1) {
+        let a = CLLocation(latitude: waypoints[i].latitude, longitude: waypoints[i].longitude)
+        let b = CLLocation(latitude: waypoints[i + 1].latitude, longitude: waypoints[i + 1].longitude)
+        total += a.distance(from: b)
+    }
+    return total
+}
+
+/// Progress (0...1) for a point that is `offsetMeters` along the route from `fromProgress`. Positive = toward end.
+private func progress(atOffsetMeters offsetMeters: Double, fromProgress: Double, along waypoints: [CLLocationCoordinate2D]) -> Double {
+    let total = totalRouteLengthMeters(waypoints: waypoints)
+    guard total > 0 else { return fromProgress }
+    let progressDelta = offsetMeters / total
+    return min(1, max(0, fromProgress + progressDelta))
+}
+
+/// Pivot = center (camera). Front = prednji kotač, rear = zadnji kotač. Svi idu po plavoj liniji.
+private let halfBikeLengthMeters: Double = 0.75
 
 private let bikeModelForwardOffset: Double = 0
 struct IslandCentralDisplayView: View {
@@ -104,8 +130,8 @@ struct IslandCentralDisplayView: View {
             ))
             .onChange(of: appState.routeProgressAlongLine) { _, progress in
                 guard let route = appState.activeRoute, !route.waypoints.isEmpty,
-                      let pos = coordinate(at: progress, along: route.waypoints) else { return }
-                appState.mapCenter = pos
+                      let pivotPos = coordinate(at: progress, along: route.waypoints) else { return }
+                appState.mapCenter = pivotPos
                 syncMapPositionFromAppState()
             }
             .onChange(of: appState.isRouteActive) { _, active in
@@ -249,11 +275,13 @@ struct IslandCentralDisplayView: View {
                         ghostBikeMarker(opacity: item.opacity, angle: item.angle)
                     }
                 }
-                if let bikeCoord = coordinate(at: appState.routeProgressAlongLine, along: route.waypoints) {
-                    let bearing = routeBearing(at: appState.routeProgressAlongLine, along: route.waypoints)
-                    let angleDegrees = bearing - appState.mapHeading + bikeModelForwardOffset
-                    let angleRounded = (angleDegrees / 5).rounded() * 5
-                    Annotation("", coordinate: bikeCoord) {
+                if route.waypoints.count >= 2,
+                   let pivotCoord = coordinate(at: appState.routeProgressAlongLine, along: route.waypoints),
+                   let frontCoord = coordinate(at: progress(atOffsetMeters: halfBikeLengthMeters, fromProgress: appState.routeProgressAlongLine, along: route.waypoints), along: route.waypoints),
+                   let rearCoord = coordinate(at: progress(atOffsetMeters: -halfBikeLengthMeters, fromProgress: appState.routeProgressAlongLine, along: route.waypoints), along: route.waypoints) {
+                    let bikeAngle = bearing(from: rearCoord, to: frontCoord) - appState.mapHeading + bikeModelForwardOffset
+                    let angleRounded = (bikeAngle / 5).rounded() * 5
+                    Annotation("", coordinate: pivotCoord) {
                         routeBike3D(size: 148, opacity: 0.82, angle: angleRounded)
                             .frame(width: 148, height: 148)
                             .allowsHitTesting(false)
