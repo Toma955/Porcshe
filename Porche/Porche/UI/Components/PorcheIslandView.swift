@@ -930,7 +930,17 @@ struct PorcheIslandView: View {
                     Button {
                         let hasRoute = appState.activeRoute.map { !$0.waypoints.isEmpty } ?? false
                         if hasRoute {
-                            appState.routeProgressAlongLine = min(1, appState.routeProgressAlongLine + 0.06)
+                            let start = appState.mapPivotProgress
+                            let end = min(1.0, start + 0.10)
+                            let steps = 12
+                            let duration = 0.38
+                            for step in 1...steps {
+                                let delay = duration * Double(step) / Double(steps)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                    let fraction = Double(step) / Double(steps)
+                                    appState.mapPivotProgress = start + (end - start) * fraction
+                                }
+                            }
                         } else {
                             appState.mapCameraDistance = min(2000, appState.mapCameraDistance + 80)
                         }
@@ -955,7 +965,12 @@ struct PorcheIslandView: View {
                         }
                         .buttonStyle(.plain)
                         Button {
-                            appState.focusMapOnUserLocationTrigger += 1
+                            let hasRoute = appState.activeRoute.map { !$0.waypoints.isEmpty } ?? false
+                            if hasRoute {
+                                appState.focusMapOnBikeTrigger += 1
+                            } else {
+                                appState.focusMapOnUserLocationTrigger += 1
+                            }
                         } label: {
                             Image(systemName: "location.fill")
                                 .font(.system(size: 14))
@@ -979,7 +994,17 @@ struct PorcheIslandView: View {
                     Button {
                         let hasRoute = appState.activeRoute.map { !$0.waypoints.isEmpty } ?? false
                         if hasRoute {
-                            appState.routeProgressAlongLine = max(0, appState.routeProgressAlongLine - 0.06)
+                            let start = appState.mapPivotProgress
+                            let end = max(0.0, start - 0.10)
+                            let steps = 12
+                            let duration = 0.38
+                            for step in 1...steps {
+                                let delay = duration * Double(step) / Double(steps)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                    let fraction = Double(step) / Double(steps)
+                                    appState.mapPivotProgress = start + (end - start) * fraction
+                                }
+                            }
                         } else {
                             appState.mapCameraDistance = max(200, appState.mapCameraDistance - 80)
                         }

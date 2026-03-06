@@ -83,7 +83,11 @@ struct Bike3DSceneView: UIViewRepresentable {
         context.coordinator.rotationSpeed = rotationSpeed
         context.coordinator.isFindMeMode = isFindMeMode
         context.coordinator.onSceneLoaded = onSceneLoaded
-        guard let scene = uiView.scene, !scene.rootNode.childNodes.isEmpty else { return }
+        let sceneValid = uiView.scene != nil && !(uiView.scene?.rootNode.childNodes.isEmpty ?? true)
+        if !sceneValid {
+            Self.applySceneSync(coordinator: context.coordinator, sceneView: uiView)
+            return
+        }
         if changed {
             context.coordinator.applyRotation(to: uiView.scene?.rootNode, speed: rotationSpeed)
             if isFindMeMode {

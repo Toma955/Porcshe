@@ -10,6 +10,7 @@ final class AppState: ObservableObject {
     @Published var isRouteActive: Bool = false
     var isFindMeMode: Bool = true
     var focusMapOnUserLocationTrigger: Int = 0
+    var focusMapOnBikeTrigger: Int = 0
     var isNavigationActive: Bool = false
     @Published var activeRoute: RouteModel?
     @Published var batteryStatus: BatteryStatus?
@@ -28,6 +29,12 @@ final class AppState: ObservableObject {
     @Published var mapStyle: MapTerrainStyle = .standard
     @Published var mapCenter: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 45.8129, longitude: 15.9775)
     @Published var routeProgressAlongLine: Double = 0
+    /// Progress (0...1) along the route for the map camera pivot. Forward/backward buttons change this; bike stays at routeProgressAlongLine.
+    @Published var mapPivotProgress: Double = 0
+    /// Total route length in km (set when route is set), for distance-traveled and range decrease.
+    @Published var routeTotalLengthKm: Double = 0
+    /// Battery range (km) at route start, for decreasing display as user travels.
+    @Published var routeStartBatteryRangeKm: Double = 0
     @Published var isNightRidingMode: Bool = false
     @Published var motorTempCelsius: Int? = 42
     @Published var batteryTempCelsius: Int? = 28

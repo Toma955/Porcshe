@@ -14,6 +14,7 @@ private struct MapCenterValue: Equatable {
 private let userLocationCameraDistance: CGFloat = 500
 private let mapBikeWidth: CGFloat = 212
 private let mapBikeHeight: CGFloat = 192
+private let routeBikeMapSize: CGFloat = 384
 private let normalBikeWidth: CGFloat = 520
 private let normalBikeHeight: CGFloat = 500
 private let routeTransitionDuration: Double = 0.28
@@ -100,6 +101,10 @@ struct IslandCentralDisplayView: View {
     @EnvironmentObject private var locationManager: LocationManager
     @State private var isBikeSceneReady = false
     @State private var homeBikeKey = 0
+    /// Kad true, onMapCameraChange ne prepisuje mapCenter (kamera vođena iz bicikla/pivota).
+    @State private var isSyncingFromPivot = false
+    /// Coalescing: najviše jedan sync po run loopu da izbjegnemo "multiple updates per frame".
+    @State private var cameraSyncScheduled = false
     @State private var mapCameraPosition: MapCameraPosition = .camera(
         MapCamera(
             centerCoordinate: CLLocationCoordinate2D(latitude: 45.8129, longitude: 15.9775),
@@ -128,14 +133,25 @@ struct IslandCentralDisplayView: View {
                 onFitRoute: fitCameraToRoute,
                 isLocationValid: isLocationValidForMap
             ))
-            .onChange(of: appState.routeProgressAlongLine) { _, progress in
-                guard let route = appState.activeRoute, !route.waypoints.isEmpty,
-                      let pivotPos = coordinate(at: progress, along: route.waypoints) else { return }
-                appState.mapCenter = pivotPos
+            .onChange(of: appState.routeProgressAlongLine) { _, _ in
+                scheduleCameraSyncToBike()
+            }
+            .onChange(of: appState.focusMapOnBikeTrigger) { _, _ in
+                guard appState.focusMapOnBikeTrigger > 0,
+                      let route = appState.activeRoute, !route.waypoints.isEmpty,
+                      let pos = coordinate(at: appState.routeProgressAlongLine, along: route.waypoints) else { return }
+                appState.mapPivotProgress = appState.routeProgressAlongLine
+                isSyncingFromPivot = true
+                appState.mapCenter = pos
                 syncMapPositionFromAppState()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { isSyncingFromPivot = false }
             }
             .onChange(of: appState.isRouteActive) { _, active in
-                if !active { homeBikeKey += 1 }
+                if active { scheduleCameraSyncToBike() }
+                else { homeBikeKey += 1 }
+            }
+            .onAppear {
+                if appState.isRouteActive { scheduleCameraSyncToBike() }
             }
     }
     private var contentWithLayout: some View {
@@ -213,6 +229,24 @@ struct IslandCentralDisplayView: View {
     private func syncMapPositionFromAppState() {
         mapCameraPosition = cameraFromAppState
     }
+
+    /// Postavi kameru na bicikl. Jedan sync po run loopu da izbjegnemo "multiple updates per frame".
+    private func scheduleCameraSyncToBike() {
+        guard appState.activeRoute.map({ !$0.waypoints.isEmpty }) ?? false else { return }
+        guard !cameraSyncScheduled else { return }
+        cameraSyncScheduled = true
+        DispatchQueue.main.async {
+            cameraSyncScheduled = false
+            guard let route = appState.activeRoute, !route.waypoints.isEmpty else { return }
+            let progress = appState.routeProgressAlongLine
+            guard let pos = coordinate(at: progress, along: route.waypoints) else { return }
+            isSyncingFromPivot = true
+            appState.mapCenter = pos
+            appState.mapPivotProgress = progress
+            syncMapPositionFromAppState()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { isSyncingFromPivot = false }
+        }
+    }
     private func ghostBikeItems(route: RouteModel, progress: Double) -> [GhostBikeItem] {
         let waypoints = route.waypoints
         guard waypoints.count >= 2 else { return [] }
@@ -250,7 +284,10 @@ struct IslandCentralDisplayView: View {
     }
 
     private func ghostBikeMarker(opacity: Double, angle: Double) -> some View {
-        routeBike3D(size: 72, opacity: opacity * 0.88, angle: angle)
+        Ellipse()
+            .fill(Color.blue.opacity(opacity * 0.7))
+            .frame(width: 24, height: 14)
+            .rotationEffect(.degrees(angle))
     }
     private var mapView: AnyView {
         switch appState.mapStyle {
@@ -273,6 +310,7 @@ struct IslandCentralDisplayView: View {
                 ForEach(ghostBikeItems(route: route, progress: appState.routeProgressAlongLine)) { item in
                     Annotation("", coordinate: item.coordinate) {
                         ghostBikeMarker(opacity: item.opacity, angle: item.angle)
+                            .allowsHitTesting(false)
                     }
                 }
                 if route.waypoints.count >= 2,
@@ -282,8 +320,8 @@ struct IslandCentralDisplayView: View {
                     let bikeAngle = bearing(from: rearCoord, to: frontCoord) - appState.mapHeading + bikeModelForwardOffset
                     let angleRounded = (bikeAngle / 5).rounded() * 5
                     Annotation("", coordinate: pivotCoord) {
-                        routeBike3D(size: 148, opacity: 0.82, angle: angleRounded)
-                            .frame(width: 148, height: 148)
+                        routeBike3D(size: routeBikeMapSize, opacity: 0.82, angle: angleRounded)
+                            .frame(width: routeBikeMapSize, height: routeBikeMapSize)
                             .allowsHitTesting(false)
                             .id("main-route-bike")
                     }
@@ -291,9 +329,18 @@ struct IslandCentralDisplayView: View {
             }
         }
         .onMapCameraChange(frequency: .onEnd) { context in
-                    appState.mapCenter = context.camera.centerCoordinate
+                    guard !isSyncingFromPivot else { return }
+                    let routeActive = appState.isRouteActive,
+                        hasWaypoints = (appState.activeRoute?.waypoints.isEmpty ?? true) == false
+                    if !routeActive || !hasWaypoints {
+                        appState.mapCenter = context.camera.centerCoordinate
+                    }
                     appState.mapCameraDistance = context.camera.distance
                     appState.mapHeading = context.camera.heading
+                    // Kad je ruta aktivna, kamera stalno gleda pivot – vrati je na pivot ako je korisnik pomaknuo.
+                    if routeActive && hasWaypoints {
+                        mapCameraPosition = cameraFromAppState
+                    }
                 }
     }
     private func fitCameraToRoute(_ waypoints: [CLLocationCoordinate2D]) {
@@ -384,7 +431,19 @@ private struct IslandCentralMapModifier: ViewModifier {
                     appState.mapCameraDistance = 420
                     appState.mapHeading = 0
                     appState.routeProgressAlongLine = 0
+                    appState.mapPivotProgress = 0
+                    appState.routeTotalLengthKm = totalRouteLengthMeters(waypoints: route.waypoints) / 1000
+                    appState.routeStartBatteryRangeKm = appState.batteryStatus?.estimatedRangeKm ?? 50
                     DispatchQueue.main.async { onSync() }
+                }
+            }
+            .onChange(of: appState.routeProgressAlongLine) { _, progress in
+                guard appState.routeTotalLengthKm > 0, appState.routeStartBatteryRangeKm > 0 else { return }
+                let distanceTraveledKm = appState.routeTotalLengthKm * progress
+                let remainingKm = max(0, appState.routeStartBatteryRangeKm - distanceTraveledKm)
+                if var bat = appState.batteryStatus {
+                    bat.estimatedRangeKm = remainingKm
+                    appState.batteryStatus = bat
                 }
             }
             .onChange(of: appState.isRouteActive) { _, active in
