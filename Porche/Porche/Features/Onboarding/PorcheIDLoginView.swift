@@ -1,8 +1,8 @@
 import SwiftUI
 
-// MARK: - PorscheIDLoginView
+// MARK: - PorcheIDLoginView
 
-struct PorscheIDLoginView: View {
+struct PorcheIDLoginView: View {
     var body: some View {
         Text("Porsche ID Login")
     }

@@ -1,9 +1,9 @@
 import Foundation
 
-// MARK: - PorscheIdentity
+// MARK: - PorcheIdentity
 
-struct PorscheIdentity {
-    var porscheId: String?
+struct PorcheIdentity {
+    var porcheId: String?
     var bikeVIN: String?
     var serviceHistoryIds: [String]
 }

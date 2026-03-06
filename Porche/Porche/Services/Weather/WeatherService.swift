@@ -5,6 +5,12 @@ import CoreLocation
 
 final class WeatherService {
     func fetchWeather(at coordinate: CLLocationCoordinate2D) async throws -> WeatherData {
-        fatalError("TODO")
+        try await Task.sleep(nanoseconds: 300_000_000)
+        return WeatherData(
+            temperature: 18,
+            condition: "Oblačno",
+            windSpeed: 12,
+            precipitation: 0.1
+        )
     }
 }

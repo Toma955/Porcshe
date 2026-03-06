@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
     "—" : {
 
     },
@@ -81,19 +78,19 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Porche eBike"
+            "value" : "Porsche eBike"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Porche eBike"
+            "value" : "Porsche eBike"
           }
         },
         "hr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Porche eBike"
+            "value" : "Porsche eBike"
           }
         }
       }
@@ -245,16 +242,16 @@
     "Poništi" : {
 
     },
-    "Porche" : {
-
-    },
-    "Porche Ebike" : {
-
-    },
-    "Porche Ebike spojen" : {
+    "Porsche" : {
 
     },
     "Porsche Account" : {
+
+    },
+    "Porsche Ebike" : {
+
+    },
+    "Porsche Ebike spojen" : {
 
     },
     "Porsche ID Login" : {
@@ -276,9 +273,6 @@
 
     },
     "Punjenje" : {
-
-    },
-    "Ride" : {
 
     },
     "Ride Detail" : {
@@ -321,6 +315,9 @@
     "Spremi" : {
 
     },
+    "Spremno za vožnju" : {
+
+    },
     "Stats" : {
 
     },
@@ -331,6 +328,9 @@
 
     },
     "Visinska profil" : {
+
+    },
+    "Vožnja" : {
 
     },
     "Weather" : {

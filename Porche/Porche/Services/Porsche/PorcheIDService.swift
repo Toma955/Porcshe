@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - PorscheIDService
+// MARK: - PorcheIDService
 
-final class PorscheIDService {
+final class PorcheIDService {
     func login() async throws {}
     func logout() {}
     var isLoggedIn: Bool { false }

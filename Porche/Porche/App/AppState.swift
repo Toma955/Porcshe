@@ -78,25 +78,3 @@ final class AppState: ObservableObject {
         devMessages = []
     }
 }
-
-struct DevMessage: Identifiable {
-    let id = UUID()
-    let category: DevMessageCategory
-    let text: String
-    let date: Date
-}
-
-enum DevMessageCategory: String, CaseIterable {
-    case general = "Općenito"
-    case network = "Mreža"
-    case bluetooth = "Bluetooth"
-    case navigation = "Navigacija"
-    case demo = "Demo"
-}
-
-enum OnboardingStep {
-    case bikeModel
-    case welcome
-    case permissions
-    case completed
-}
