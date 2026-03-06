@@ -2,7 +2,7 @@ import XCTest
 import CoreLocation
 @testable import Porche
 
-// MARK: - PorcheIntegrationTests
+// MARK: - Integration test
 
 final class PorcheIntegrationTests: XCTestCase {
 

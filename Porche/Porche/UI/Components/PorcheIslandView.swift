@@ -2486,6 +2486,9 @@ private struct IslandCircleIconButton<Icon: View>: View {
         .buttonStyle(.plain)
     }
 }
+
+}
+
 #Preview {
     ZStack(alignment: .bottom) {
         Color.gray.opacity(0.3).ignoresSafeArea()
