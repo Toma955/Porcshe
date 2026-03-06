@@ -1046,44 +1046,28 @@ struct PorcheIslandView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minHeight: collapsedHeight)
     }
-    /// Jedan GPS element kad je destinacija-do-destinacije: upute + Za X m + preostalo/ukupno.
+    /// Jedan GPS element: ikona lijevo, natpis i odbrojavanje u sredini.
     private var pillElementGpsUpute: some View {
         let (meters, instruction) = navCountdownToNextTurn
-        let (total, remaining) = routeDistanceAtoB
         let instr = instruction ?? "Slijedite rutu"
         return ZStack {
-            VStack(spacing: 6) {
+            HStack(spacing: 12) {
                 Image(systemName: navTurnIcon(instr))
-                    .font(.system(size: 24))
+                    .font(.system(size: 28))
                     .foregroundStyle(islandColors.accentGreen)
-                Text(instr)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(islandColors.title)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                Text(meters >= 0 ? "Za \(Int(meters)) m" : "—")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(islandColors.secondary)
-                HStack(spacing: 14) {
-                    VStack(spacing: 2) {
-                        Text("\(Int(remaining / 1000)) km")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(islandColors.title)
-                        Text("Preostalo")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(islandColors.secondary)
-                    }
-                    VStack(spacing: 2) {
-                        Text("\(Int(total / 1000)) km")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(islandColors.secondary)
-                        Text("Ukupno")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(islandColors.secondary)
-                    }
+                VStack(spacing: 4) {
+                    Text(instr)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(islandColors.title)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                    Text(meters >= 0 ? "Za \(Int(meters)) m" : "—")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(islandColors.secondary)
                 }
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
